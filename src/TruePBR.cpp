@@ -560,6 +560,7 @@ struct BSLightingShaderProperty_LoadBinary
 		RE::BSShaderMaterial::Feature feature = RE::BSShaderMaterial::Feature::kDefault;
 		stream.iStr->read(&feature, 1);
 
+		// 调用原始方法，注意这里不使用func
 		{
 			auto vtable = REL::Relocation<void***>(RE::NiShadeProperty::VTABLE[0]);
 			auto baseMethod = reinterpret_cast<void (*)(RE::NiShadeProperty*, RE::NiStream&)>((vtable.get()[0x18]));
@@ -571,6 +572,7 @@ struct BSLightingShaderProperty_LoadBinary
 		bool isPbr = false;
 		{
 			RE::BSLightingShaderMaterialBase* material = nullptr;
+			// 如果flags中包含kMenuScreen，那么使用PBR材质；这里可能是使用一个不被原版使用的flag作为PBR的标志
 			if (property->flags.any(kMenuScreen)) {
 				auto* pbrMaterial = BSLightingShaderMaterialPBR::Make();
 				pbrMaterial->loadedWithFeature = feature;
@@ -580,9 +582,11 @@ struct BSLightingShaderProperty_LoadBinary
 				material = RE::BSLightingShaderMaterialBase::CreateMaterial(feature);
 			}
 			property->LinkMaterial(nullptr, false);
+			// 指定材质
 			property->material = material;
 		}
 
+		// 从stream中读取材质的其他属性，猜测PBR需要的数据应该在原版数据之后,以指定格式追加
 		{
 			stream.iStr->read(&property->material->texCoordOffset[0].x, 1);
 			stream.iStr->read(&property->material->texCoordOffset[0].y, 1);
@@ -652,6 +656,22 @@ struct BSLightingShaderProperty_LoadBinary
 
 struct BSLightingShaderProperty_GetRenderPasses
 {
+	/**
+	 * 此函数根据某些条件修改给定BSLightingShaderProperty的渲染通道。
+	 *
+	 * @param property 指向BSLightingShaderProperty对象的指针。
+	 * @param geometry 指向BSGeometry对象的指针。
+	 * @param renderFlags 表示渲染标志的32位无符号整数。
+	 * @param accumulator 指向BSShaderAccumulator对象的指针。
+	 * @return 指向RenderPassArray对象的指针，该对象可能会根据条件进行修改。
+	 *
+	 * 该函数执行以下操作：
+	 * - 调用原始函数以获取渲染通道。
+	 * - 检查属性是否具有顶点照明，并且材质特性是否为Default或MultiTexLandLODBlend。
+	 * - 遍历渲染通道，如果着色器类型为Lighting，则修改照明标志。
+	 * - 如果满足PBR（基于物理的渲染）的条件，则设置TruePbr标志并清除Specular标志。
+	 * - 此外，如果材质启用了glint参数，则设置AnisoLighting标志。
+	 */
 	static RE::BSShaderProperty::RenderPassArray* thunk(RE::BSLightingShaderProperty* property, RE::BSGeometry* geometry, std::uint32_t renderFlags, RE::BSShaderAccumulator* accumulator)
 	{
 		auto renderPasses = func(property, geometry, renderFlags, accumulator);
@@ -700,7 +720,24 @@ struct BSLightingShaderProperty_GetRenderPasses
 };
 
 struct BSLightingShader_SetupMaterial
+
 {
+/**
+ * @brief 这是BSLightingShader类的thunk函数，用于处理各种着色器技术和材质的应用。
+ * 
+ * @param shader 指向BSLightingShader实例的指针。
+ * @param material 指向BSLightingShaderMaterialBase实例的指针。
+ * 
+ * 该函数执行以下任务：
+ * - 检索当前的照明着色器技术和标志。
+ * - 准备顶点和像素着色器常量组。
+ * - 根据照明类型，为材质设置各种纹理和着色器常量。
+ * - 处理景观和非景观材质的特定情况，包括设置纹理参数、PBR参数和着色器标志。
+ * - 如果设置了CharacterLight标志，则应用角色光纹理和参数。
+ * - 刷新并应用顶点和像素着色器常量组。
+ * 
+ * 如果照明类型不是LODLand或LODLandNoise且未设置TruePbr标志，则调用原始函数。
+ */
 	static void thunk(RE::BSLightingShader* shader, RE::BSLightingShaderMaterialBase const* material)
 	{
 		using enum SIE::ShaderCache::LightingShaderTechniques;

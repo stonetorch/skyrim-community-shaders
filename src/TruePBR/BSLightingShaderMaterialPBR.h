@@ -30,6 +30,9 @@ enum class PBRShaderFlags : uint32_t
 	ProjectedGlint = 1 << 12,
 };
 
+/**
+ * @brief material的Property数据来自文件流的额外部分，纹理数据复用原版的TextureSet
+ */
 class BSLightingShaderMaterialPBR : public RE::BSLightingShaderMaterialBase
 {
 public:

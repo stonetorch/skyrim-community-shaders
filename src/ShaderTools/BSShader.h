@@ -1,3 +1,7 @@
+/***
+ * 在该文件产生的时候，SKSE官方应该还没有完成对BSShader的逆向工作，
+ * 现在已经可以通过CommonLibSSE来获取BSShader以及PixelShader、VertexShader的定义了
+ */
 #pragma once
 
 #include "d3d11.h"
