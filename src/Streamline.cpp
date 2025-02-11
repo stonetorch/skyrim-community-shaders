@@ -207,7 +207,7 @@ HRESULT Streamline::CreateDeviceAndSwapChain(IDXGIAdapter* pAdapter,
 
 	HRESULT hr = S_OK;
 
-	if (featureDLSSG && !REL::Module::IsVR()) {
+	if (featureDLSSG && !REL::Module::IsVR()) { // 判断启动dlss的条件
 		logger::info("[Streamline] Proxying D3D11CreateDeviceAndSwapChain to add D3D12 swapchain");
 
 		auto slD3D11CreateDeviceAndSwapChain = reinterpret_cast<decltype(&D3D11CreateDeviceAndSwapChain)>(GetProcAddress(interposer, "D3D11CreateDeviceAndSwapChain"));

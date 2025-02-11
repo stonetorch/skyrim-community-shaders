@@ -564,7 +564,6 @@ void Deferred::ResetBlendStates()
 
 	auto shadowState = RE::BSGraphics::RendererShadowState::GetSingleton();
 	GET_INSTANCE_MEMBER(stateUpdateFlags, shadowState)
-
 	stateUpdateFlags.set(RE::BSGraphics::ShaderFlags::DIRTY_ALPHA_BLEND);
 }
 

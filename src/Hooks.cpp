@@ -265,6 +265,7 @@ HRESULT WINAPI hk_D3D11CreateDeviceAndSwapChain(
 	pAdapter->GetDesc(&adapterDesc);
 	State::GetSingleton()->SetAdapterDescription(adapterDesc.Description);
 
+	// 使用Steamline提供的Device
 	const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;  // Create a device with only the latest feature level
 	auto result = Streamline::GetSingleton()->CreateDeviceAndSwapChain(
 		pAdapter,

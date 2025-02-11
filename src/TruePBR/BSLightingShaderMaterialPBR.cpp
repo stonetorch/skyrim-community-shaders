@@ -44,6 +44,7 @@ void BSLightingShaderMaterialPBR::CopyMembers(RE::BSShaderMaterial* that)
 	All[this] = All[pbrThat];
 }
 
+
 std::uint32_t BSLightingShaderMaterialPBR::ComputeCRC32(uint32_t srcHash)
 {
 	struct HashContainer

@@ -15,6 +15,9 @@ using namespace std::chrono;
 
 namespace ShaderConstants
 {
+	/**
+	 * @brief PS使用的常量，LightingPS可能对应Lighting.hlsl中定义的cbuffer结构体
+	 */
 	struct LightingPS
 	{
 		static const LightingPS& Get()

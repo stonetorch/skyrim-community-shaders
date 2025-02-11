@@ -145,13 +145,13 @@ void MessageHandler(SKSE::MessagingInterface::Message* message)
 
 bool Load()
 {
-	if (ENB_API::RequestENBAPI()) {
-		logger::info("ENB detected, disabling all hooks and features");
-		return true;
-	}
+//	if (ENB_API::RequestENBAPI()) {
+//		logger::info("ENB detected, disabling all hooks and features");
+//		return true;
+//	}
 
 	if (REL::Module::IsVR()) {
-		REL::IDDatabase::get().IsVRAddressLibraryAtLeastVersion("0.158.0", true);
+//		REL::IDDatabase::get().IsVRAddressLibraryAtLeastVersion("0.158.0", true);
 	}
 
 	auto privateProfileRedirectorVersion = Util::GetDllVersion(L"Data/SKSE/Plugins/PrivateProfileRedirector.dll");

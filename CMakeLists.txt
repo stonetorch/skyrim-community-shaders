@@ -11,10 +11,11 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 # ########################################################################################################################
 # ## Build options
 # ########################################################################################################################
+set(ENV{CommunityShadersOutputDir} "D:/Tes5/JueLunV4/Mod Organizer 2/mods/CommunityShader")
 message("Options:")
-option(AUTO_PLUGIN_DEPLOYMENT "Copy the build output and addons to env:CommunityShadersOutputDir." OFF)
-option(ZIP_TO_DIST "Zip the base mod and addons to their own 7z file in dist." ON)
-option(AIO_ZIP_TO_DIST "Zip the base mod and addons to a AIO 7z file in dist." ON)
+option(AUTO_PLUGIN_DEPLOYMENT "Copy the build output and addons to env:CommunityShadersOutputDir." ON)
+option(ZIP_TO_DIST "Zip the base mod and addons to their own 7z file in dist." OFF)
+option(AIO_ZIP_TO_DIST "Zip the base mod and addons to a AIO 7z file in dist." OFF)
 option(TRACY_SUPPORT "Enable support for tracy profiler" OFF)
 message("\tAuto plugin deployment: ${AUTO_PLUGIN_DEPLOYMENT}")
 message("\tZip to dist: ${ZIP_TO_DIST}")
@@ -51,6 +52,16 @@ target_compile_definitions(
 	PRIVATE
 	"$<$<BOOL:${TRACY_SUPPORT}>:TRACY_SUPPORT>"
 )
+
+# 添加编译器参数 /WX-
+target_compile_options(
+	${PROJECT_NAME}
+	PRIVATE
+	/WX-
+)
+
+add_compile_options("/source-charset:utf-8")
+add_compile_options("/execution-charset:utf-8")
 
 target_include_directories(
 	${PROJECT_NAME}

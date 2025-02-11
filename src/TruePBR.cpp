@@ -720,40 +720,36 @@ struct BSLightingShaderProperty_GetRenderPasses
 };
 
 struct BSLightingShader_SetupMaterial
-
 {
-/**
- * @brief 这是BSLightingShader类的thunk函数，用于处理各种着色器技术和材质的应用。
+	/**
+ * @brief 这是BSLightingShader类的thunk函数
  * 
  * @param shader 指向BSLightingShader实例的指针。
- * @param material 指向BSLightingShaderMaterialBase实例的指针。
- * 
- * 该函数执行以下任务：
- * - 检索当前的照明着色器技术和标志。
- * - 准备顶点和像素着色器常量组。
- * - 根据照明类型，为材质设置各种纹理和着色器常量。
- * - 处理景观和非景观材质的特定情况，包括设置纹理参数、PBR参数和着色器标志。
- * - 如果设置了CharacterLight标志，则应用角色光纹理和参数。
- * - 刷新并应用顶点和像素着色器常量组。
- * 
- * 如果照明类型不是LODLand或LODLandNoise且未设置TruePbr标志，则调用原始函数。
+ * @param material 使用的Material
  */
 	static void thunk(RE::BSLightingShader* shader, RE::BSLightingShaderMaterialBase const* material)
 	{
 		using enum SIE::ShaderCache::LightingShaderTechniques;
 
+		// alias，记录PS中使用的常量
 		const auto& lightingPSConstants = ShaderConstants::LightingPS::Get();
 
 		auto lightingFlags = shader->currentRawTechnique & ~(~0u << 24);
 		auto lightingType = static_cast<SIE::ShaderCache::LightingShaderTechniques>((shader->currentRawTechnique >> 24) & 0x3F);
+
+		// 如果不符合要求则调用原始函数，符合要求则进行修改
 		if (!(lightingType == LODLand || lightingType == LODLandNoise) && (lightingFlags & static_cast<uint32_t>(SIE::ShaderCache::LightingShaderFlags::TruePbr))) {
+			// 获取的shadowState和renderer对象，不知道干什么用的
+			// shadowState似乎不仅用于阴影，而是用于所有渲染行为
 			auto shadowState = RE::BSGraphics::RendererShadowState::GetSingleton();
 			auto renderer = RE::BSGraphics::Renderer::GetSingleton();
 
+			// 准备顶点和像素着色器常量组,调用原始函数，不知道具体作用
 			RE::BSGraphics::Renderer::PrepareVSConstantGroup(RE::BSGraphics::ConstantGroupLevel::PerMaterial);
 			RE::BSGraphics::Renderer::PreparePSConstantGroup(RE::BSGraphics::ConstantGroupLevel::PerMaterial);
 
 			if (lightingType == MTLand || lightingType == MTLandLODBlend) {
+				// 情况1：景观材质
 				auto* pbrMaterial = static_cast<const BSLightingShaderMaterialPBRLandscape*>(material);
 
 				constexpr size_t NormalStartIndex = 7;
@@ -835,6 +831,9 @@ struct BSLightingShader_SetupMaterial
 					shadowState->SetPSConstant(lodTexParams, RE::BSGraphics::ConstantGroupLevel::PerMaterial, lightingPSConstants.LODTexParams);
 				}
 			} else if (lightingType == None || lightingType == TreeAnim) {
+				// 情况2：非景观材质
+				
+				// 为shadowState设置纹理
 				auto* pbrMaterial = static_cast<const BSLightingShaderMaterialPBR*>(material);
 				if (pbrMaterial->diffuseRenderTargetSourceIndex != -1) {
 					shadowState->SetPSTexture(0, renderer->GetRuntimeData().renderTargets[pbrMaterial->diffuseRenderTargetSourceIndex]);
@@ -852,6 +851,8 @@ struct BSLightingShader_SetupMaterial
 				shadowState->SetPSTextureAddressMode(5, static_cast<RE::BSGraphics::TextureAddressMode>(pbrMaterial->textureClampMode));
 				shadowState->SetPSTextureFilterMode(5, RE::BSGraphics::TextureFilterMode::kAnisotropic);
 
+				// 这里看来shadowState似乎被用于渲染流程了，所有需要的常量缓冲区被设置到了shadowState中
+				// 准备PBRFlags常量, 稍后被写入lightingPSConstants.PBRFlags对应的PSConstants，被着色器读取
 				stl::enumeration<PBRShaderFlags> shaderFlags;
 				if (pbrMaterial->pbrFlags.any(PBRFlags::TwoLayer)) {
 					shaderFlags.set(PBRShaderFlags::TwoLayer);
@@ -890,6 +891,9 @@ struct BSLightingShader_SetupMaterial
 						shadowState->SetPSConstant(PBRParams2, RE::BSGraphics::ConstantGroupLevel::PerMaterial, lightingPSConstants.PBRParams2);
 					}
 					if (pbrMaterial->pbrFlags.any(PBRFlags::Fuzz)) {
+						// Fuzz是一种模糊效果，用于模拟绒毛
+						// Fuzz的参数被设置到lightingPSConstants.MultiLayerParallaxData对应的PSConstants中，被着色器读取
+						// 在着色器Lighting.hlsl中，先检查pbrFlag，然后从MultiLayerParallaxData中读取参数，用于Fuzz效果的渲染a
 						shaderFlags.set(PBRShaderFlags::Fuzz);
 
 						std::array<float, 4> PBRParams3;
@@ -922,6 +926,7 @@ struct BSLightingShader_SetupMaterial
 					}
 				}
 
+				// 使用SetPSConstant设置着色器需要的参数，其中index使用lightingPSConstants里面记录的数值，用来决定设置哪个参数
 				{
 					std::array<float, 4> PBRProjectedUVParams1;
 					PBRProjectedUVParams1[0] = pbrMaterial->GetProjectedMaterialBaseColorScale()[0];
@@ -1028,6 +1033,8 @@ struct BSLightingShader_SetupGeometry
 {
 	static void thunk(RE::BSLightingShader* shader, RE::BSRenderPass* pass, uint32_t renderFlags)
 	{
+		// 保存原始的Technique，修改一些flag，调用原始函数，然后恢复
+		// 这应该是为了避免TruePBR借用的标志位与游戏原有的标志位冲突
 		const auto originalTechnique = shader->currentRawTechnique;
 
 		if ((shader->currentRawTechnique & static_cast<uint32_t>(SIE::ShaderCache::LightingShaderFlags::TruePbr)) != 0) {
@@ -1035,7 +1042,7 @@ struct BSLightingShader_SetupGeometry
 			shader->currentRawTechnique ^= static_cast<uint32_t>(SIE::ShaderCache::LightingShaderFlags::AnisoLighting);
 		}
 
-		shader->currentRawTechnique &= ~0b111000u;
+		shader->currentRawTechnique &= ~0b111000u; // 清除Deferred与TruePBR 标志 ，还有一个未知的1<<5
 		shader->currentRawTechnique |= (std::min((pass->numLights - 1), 7) << 3);
 
 		func(shader, pass, renderFlags);

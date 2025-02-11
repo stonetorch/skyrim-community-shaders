@@ -30,6 +30,7 @@ namespace BSShaderHooks
                         continue;
 
                     // 提取文件名和技术 ID
+					// 技术ID是文件名第一个下划线前的内容
                     auto filenameStr = entry.path().filename().string();
                     auto techniqueIdStr = filenameStr.substr(0, filenameStr.find('_'));
                     const REX::TechniqueID techniqueId = std::strtoul(techniqueIdStr.c_str(), nullptr, 16);
@@ -39,6 +40,8 @@ namespace BSShaderHooks
                 }
 
                 // 遍历像素着色器表
+				// bsShader应该是一个管理Shader的表格，有可能是单例？不过看hook的方式，可能存在多个bsShader对象，分管不同的领域
+				// 这里遍历bsShader记录的PS表格，并覆盖所有能够替换的PS（根据之前创建的TechniqueID匹配，而TechniqueID是由某个神奇的算法算出来的，有点像hash）
                 for (const auto& entry : bsShader->m_PixelShaderTable) {
                     auto tFileIt = techniqueFileMap.find(entry->m_TechniqueID);
                     if (tFileIt != techniqueFileMap.end()) {

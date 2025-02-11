@@ -55,6 +55,9 @@ public:
 	// override (BSLightingShaderMaterialBase)
 	RE::BSShaderMaterial* Create() override;                                                                                      // 01
 	void CopyMembers(RE::BSShaderMaterial* that) override;                                                                        // 02
+	/**
+     * @brief Compute the CRC32 hash for the material
+     */
 	std::uint32_t ComputeCRC32(uint32_t srcHash) override;                                                                        // 04
 	Feature GetFeature() const override;                                                                                          // 06
 	void OnLoadTextureSet(std::uint64_t arg1, RE::BSTextureSet* inTextureSet) override;                                           // 08

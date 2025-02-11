@@ -164,6 +164,9 @@ private:
 class Buffer
 {
 public:
+	/**
+	 * \brief 用于创建游戏中缓冲区的辅助类。简化创建Buffer的流程
+	 */
 	explicit Buffer(D3D11_BUFFER_DESC const& a_desc, D3D11_SUBRESOURCE_DATA* a_init = nullptr) :
 		desc(a_desc)
 	{
