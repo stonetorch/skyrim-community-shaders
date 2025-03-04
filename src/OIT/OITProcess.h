@@ -1,0 +1,12 @@
+//
+// Created by 14982 on 2025/3/4.
+//
+
+#ifndef COMMUNITYSHADERS_OITPROCESS_H
+#define COMMUNITYSHADERS_OITPROCESS_H
+
+class OITProcess
+{
+};
+
+#endif  //COMMUNITYSHADERS_OITPROCESS_H
