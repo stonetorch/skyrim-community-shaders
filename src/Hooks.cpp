@@ -112,12 +112,17 @@ bool Hooks::BSShader_BeginTechnique::thunk(RE::BSShader* shader, uint32_t vertex
 	state->modifiedVertexDescriptor = vertexDescriptor;
 	state->modifiedPixelDescriptor = pixelDescriptor;
 
+	// BS引擎通过两个descriptor寻找需要的shader，在前面注册时有使用一些位置用作自己的标识，现在需要先清除这些位置
+	// 防止对原版流程造成影响
 	state->ModifyShaderLookup(*shader, state->modifiedVertexDescriptor, state->modifiedPixelDescriptor);
 
 	bool shaderFound = func(shader, vertexDescriptor, pixelDescriptor, skipPixelShader);
 
 	if (!shaderFound && shader->shaderType.get() != RE::BSShader::Type::Effect) {
-		auto& shaderCache = SIE::ShaderCache::Instance();
+#if DEBUG
+		logger::debug("Shader Replaced {} {}", state->modifiedVertexDescriptor, state->modifiedPixelDescriptor);
+#endif
+			auto& shaderCache = SIE::ShaderCache::Instance();
 		RE::BSGraphics::VertexShader* vertexShader = shaderCache.GetVertexShader(*shader, state->modifiedVertexDescriptor);
 		RE::BSGraphics::PixelShader* pixelShader = shaderCache.GetPixelShader(*shader, state->modifiedPixelDescriptor);
 		if (vertexShader == nullptr || (!skipPixelShader && pixelShader == nullptr)) {
@@ -147,11 +152,11 @@ namespace EffectExtensions
 		static void thunk(RE::BSShader* shader, RE::BSRenderPass* pass, uint32_t renderFlags)
 		{
 			func(shader, pass, renderFlags);
-			if (auto* shaderProperty = static_cast<RE::BSShaderProperty*>(pass->geometry->GetGeometryRuntimeData().properties[1].get())) {
-				if (shaderProperty->flags.any(RE::BSShaderProperty::EShaderPropertyFlag::kUniformScale)) {
-					State::GetSingleton()->currentExtraDescriptor |= (uint)State::ExtraShaderDescriptors::EffectShadows;
-				}
-			}
+//			if (auto* shaderProperty = static_cast<RE::BSShaderProperty*>(pass->geometry->GetGeometryRuntimeData().properties[1].get())) {
+//				if (shaderProperty->flags.any(RE::BSShaderProperty::EShaderPropertyFlag::kUniformScale)) {
+//					State::GetSingleton()->currentExtraDescriptor |= (uint)State::ExtraShaderDescriptors::EffectShadows;
+//				}
+//			}
 		}
 		static inline REL::Relocation<decltype(thunk)> func;
 	};
@@ -174,6 +179,7 @@ struct IDXGISwapChain_Present
 void Hooks::BSGraphics_SetDirtyStates::thunk(bool isCompute)
 {
 	func(isCompute);
+	return;
 	State::GetSingleton()->Draw();
 }
 
@@ -670,13 +676,13 @@ namespace Hooks
 
 		logger::info("Hooking BSGraphics::SetDirtyStates");
 		stl::detour_thunk<BSGraphics_SetDirtyStates>(REL::RelocationID(75580, 77386));
-
+		//
 		logger::info("Hooking BSGraphics::Renderer::InitD3D");
 		stl::write_thunk_call<BSGraphics_Renderer_Init_InitD3D>(REL::RelocationID(75595, 77226).address() + REL::Relocate(0x50, 0x2BC));
-
+		//
 		logger::info("Hooking WndProcHandler");
 		stl::write_thunk_call<RegisterClassA_Hook, 6>(REL::VariantID(75591, 77226, 0xDC4B90).address() + REL::VariantOffset(0x8E, 0x15C, 0x99).offset());
-
+		//
 		logger::info("Hooking BSShaderRenderTargets::Create");
 		stl::detour_thunk<BSShaderRenderTargets_Create>(REL::RelocationID(100458, 107175));
 
@@ -722,8 +728,8 @@ namespace Hooks
 			logger::info("Hooking D3D11CreateDeviceAndSwapChain");
 			*(uintptr_t*)&ptrD3D11CreateDeviceAndSwapChain = SKSE::PatchIAT(hk_D3D11CreateDeviceAndSwapChain, "d3d11.dll", "D3D11CreateDeviceAndSwapChain");
 
-			logger::info("Hooking CreateDXGIFactory");
-			*(uintptr_t*)&ptrCreateDXGIFactory = SKSE::PatchIAT(hk_CreateDXGIFactory, "dxgi.dll", !REL::Module::IsVR() ? "CreateDXGIFactory" : "CreateDXGIFactory1");
+//			logger::info("Hooking CreateDXGIFactory");
+//			*(uintptr_t*)&ptrCreateDXGIFactory = SKSE::PatchIAT(hk_CreateDXGIFactory, "dxgi.dll", !REL::Module::IsVR() ? "CreateDXGIFactory" : "CreateDXGIFactory1");
 		} else if (!state->IsFeatureDisabled("Upscaling")) {
 			logger::info("Hooking D3D11CreateDeviceAndSwapChain");
 			*(uintptr_t*)&ptrD3D11CreateDeviceAndSwapChain = SKSE::PatchIAT(hk_D3D11CreateDeviceAndSwapChainNoStreamline, "d3d11.dll", "D3D11CreateDeviceAndSwapChain");

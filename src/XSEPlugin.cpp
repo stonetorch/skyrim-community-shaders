@@ -1,4 +1,7 @@
 #include "Hooks.h"
+#include <OIT/Hooks.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_sinks.h>
 
 #include "Deferred.h"
 #include "Feature.h"
@@ -19,9 +22,19 @@ bool Load();
 
 void InitializeLog([[maybe_unused]] spdlog::level::level_enum a_level = spdlog::level::info)
 {
-#ifndef NDEBUG
-	auto sink = std::make_shared<spdlog::sinks::msvc_sink_mt>();
-#else
+	// 创建一个控制台输出的 sink
+	//	auto consoleSink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
+	//	consoleSink->set_level(spdlog::level::debug);
+	//
+	//	// 创建 logger 并设置级别
+	//	auto log = std::make_shared<spdlog::logger>("global log", consoleSink);
+	//	log->set_level(a_level);
+	//	log->flush_on(spdlog::level::info);
+	//
+	//	// 设置默认 logger
+	//	spdlog::set_default_logger(log);
+	//	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] [%s:%#] %v");
+	//
 	auto path = logger::log_directory();
 	if (!path) {
 		util::report_and_fail("Failed to find standard logging directory"sv);
@@ -29,7 +42,6 @@ void InitializeLog([[maybe_unused]] spdlog::level::level_enum a_level = spdlog::
 
 	*path /= std::format("{}.log"sv, Plugin::NAME);
 	auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
-#endif
 
 #ifndef NDEBUG
 	const auto level = spdlog::level::trace;
@@ -79,13 +91,15 @@ void MessageHandler(SKSE::MessagingInterface::Message* message)
 	case SKSE::MessagingInterface::kPostPostLoad:
 		{
 			if (errors.empty()) {
+				OIT::Hooks::Install();
+				return ;
 				auto state = State::GetSingleton();
 				state->PostPostLoad();  // state should load first so basic information is populated
 				Deferred::Hooks::Install();
 				TruePBR::GetSingleton()->PostPostLoad();
-				if (!state->IsFeatureDisabled("Upscaling")) {
-					Upscaling::InstallHooks();
-				}
+				//				if (!state->IsFeatureDisabled("Upscaling")) {
+				//					Upscaling::InstallHooks();
+				//				}
 				Hooks::Install();
 				FrameAnnotations::OnPostPostLoad();
 
@@ -96,11 +110,11 @@ void MessageHandler(SKSE::MessagingInterface::Message* message)
 				if (shaderCache.UseFileWatcher())
 					shaderCache.StartFileWatcher();
 
-				for (auto* feature : Feature::GetFeatureList()) {
-					if (feature->loaded) {
-						feature->PostPostLoad();
-					}
-				}
+				//				for (auto* feature : Feature::GetFeatureList()) {
+				//					if (feature->loaded) {
+				//						feature->PostPostLoad();
+				//					}
+				//				}
 			}
 
 			break;
@@ -145,40 +159,44 @@ void MessageHandler(SKSE::MessagingInterface::Message* message)
 
 bool Load()
 {
-//	if (ENB_API::RequestENBAPI()) {
-//		logger::info("ENB detected, disabling all hooks and features");
-//		return true;
-//	}
+	//	if (ENB_API::RequestENBAPI()) {
+	//		logger::info("ENB detected, disabling all hooks and features");
+	//		return true;
+	//	}
 
 	if (REL::Module::IsVR()) {
-//		REL::IDDatabase::get().IsVRAddressLibraryAtLeastVersion("0.158.0", true);
+		//		REL::IDDatabase::get().IsVRAddressLibraryAtLeastVersion("0.158.0", true);
 	}
 
 	auto privateProfileRedirectorVersion = Util::GetDllVersion(L"Data/SKSE/Plugins/PrivateProfileRedirector.dll");
-	if (privateProfileRedirectorVersion.has_value() && privateProfileRedirectorVersion.value().compare(REL::Version(0, 6, 2)) == std::strong_ordering::less) {
-		stl::report_and_fail("Old version of PrivateProfileRedirector detected, 0.6.2+ required if using it."sv);
-	}
+	//	if (privateProfileRedirectorVersion.has_value() && privateProfileRedirectorVersion.value().compare(REL::Version(0, 6, 2)) == std::strong_ordering::less) {
+	//		stl::report_and_fail("Old version of PrivateProfileRedirector detected, 0.6.2+ required if using it."sv);
+	//	}
 
 	auto messaging = SKSE::GetMessagingInterface();
 	messaging->RegisterListener("SKSE", MessageHandler);
 
 	auto state = State::GetSingleton();
 	state->Load();
+
+	// Prepare logger
 	auto log = spdlog::default_logger();
+#if DEBUG
+	log->set_level(spdlog::level::debug);
+#endif
 	log->set_level(state->GetLogLevel());
-
-	const std::array dlls = {
-		L"Data/SKSE/Plugins/ShaderTools.dll",
-		L"Data/SKSE/Plugins/SSEShaderTools.dll"
-	};
-
-	for (const auto dll : dlls) {
-		if (LoadLibrary(dll)) {
-			auto errorMessage = std::format("Incompatible DLL {} detected", stl::utf16_to_utf8(dll).value_or("<unicode conversion error>"s));
-			logger::error("{}", errorMessage);
-			errors.push_back(errorMessage);
-		}
-	}
+	//	const std::array dlls = {
+	//		L"Data/SKSE/Plugins/ShaderTools.dll",
+	//		L"Data/SKSE/Plugins/SSEShaderTools.dll"
+	//	};
+	//
+	//	for (const auto dll : dlls) {
+	//		if (LoadLibrary(dll)) {
+	//			auto errorMessage = std::format("Incompatible DLL {} detected", stl::utf16_to_utf8(dll).value_or("<unicode conversion error>"s));
+	//			logger::error("{}", errorMessage);
+	//			errors.push_back(errorMessage);
+	//		}
+	//	}
 
 	if (errors.empty())
 		Hooks::InstallD3DHooks();

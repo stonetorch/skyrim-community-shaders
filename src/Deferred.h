@@ -74,6 +74,10 @@ public:
 	};
 
 	ID3D11ComputeShader* copyShadowCS = nullptr;
+	// 保存使用CopyShadowData.hlsl保存的来自不知道哪的数据，结构为PerFrame,PerFrame2,PerFrame3等
+	// 其中PerFrame2 存放的数据包括摄像头坐标，投影向量等
+	// 推测这里保存的数据来自当前context绑定的PS常量缓冲区，即与CopyShadowData方法调用的时机有关，推测该时机为ShadowState运算
+	// 实际运行实际为BSGraphics_SetDirtyStates hook
 	Buffer* perShadow = nullptr;
 	ID3D11ShaderResourceView* shadowView = nullptr;
 

@@ -555,6 +555,7 @@ struct BSLightingShaderProperty_LoadBinary
 {
 	static void thunk(RE::BSLightingShaderProperty* property, RE::NiStream& stream)
 	{
+		// 总结一下这里做的事情：从文件流加载数据时将返回的shader替换成PBRMaterial，同时实现了PBR材质额外数据的加载
 		using enum RE::BSShaderProperty::EShaderPropertyFlag;
 
 		RE::BSShaderMaterial::Feature feature = RE::BSShaderMaterial::Feature::kDefault;
@@ -692,7 +693,7 @@ struct BSLightingShaderProperty_GetRenderPasses
 				auto lightingTechnique = currentPass->passEnum - LightingTechniqueStart;
 				auto lightingFlags = lightingTechnique & ~(~0u << 24);
 				auto lightingType = static_cast<SIE::ShaderCache::LightingShaderTechniques>((lightingTechnique >> 24) & 0x3F);
-				lightingFlags &= ~0b111000u;
+				lightingFlags &= ~0b111000u; // 取消某些标志
 				if (isPbr) {
 					lightingFlags |= static_cast<uint32_t>(SIE::ShaderCache::LightingShaderFlags::TruePbr);
 					lightingFlags &= ~static_cast<uint32_t>(SIE::ShaderCache::LightingShaderFlags::Specular);
@@ -832,7 +833,7 @@ struct BSLightingShader_SetupMaterial
 				}
 			} else if (lightingType == None || lightingType == TreeAnim) {
 				// 情况2：非景观材质
-				
+
 				// 为shadowState设置纹理
 				auto* pbrMaterial = static_cast<const BSLightingShaderMaterialPBR*>(material);
 				if (pbrMaterial->diffuseRenderTargetSourceIndex != -1) {
@@ -1042,7 +1043,7 @@ struct BSLightingShader_SetupGeometry
 			shader->currentRawTechnique ^= static_cast<uint32_t>(SIE::ShaderCache::LightingShaderFlags::AnisoLighting);
 		}
 
-		shader->currentRawTechnique &= ~0b111000u; // 清除Deferred与TruePBR 标志 ，还有一个未知的1<<5
+		shader->currentRawTechnique &= ~0b111000u;  // 清除Deferred与TruePBR 标志 ，还有一个未知的1<<5
 		shader->currentRawTechnique |= (std::min((pass->numLights - 1), 7) << 3);
 
 		func(shader, pass, renderFlags);

@@ -1088,6 +1088,7 @@ namespace SIE
 							magic_enum::enum_name(shader.shaderType.get()),
 							descriptor);
 					} else {
+						// 根据Shader中提及的语义添加attribute，还不知道attribute是干什么用的
 						std::string_view semanticName = inputDesc.SemanticName;
 						if (semanticName == "POSITION" && inputDesc.SemanticIndex == 0) {
 							AddAttribute(vertexDesc, RE::BSGraphics::Vertex::VA_POSITION);

@@ -24,14 +24,14 @@ void State::Draw()
 	const auto& shaderCache = SIE::ShaderCache::Instance();
 	if (shaderCache.IsEnabled()) {
 		auto terrainBlending = TerrainBlending::GetSingleton();
-		if (terrainBlending->loaded)
-			terrainBlending->TerrainShaderHacks();
+//		if (terrainBlending->loaded)
+//			terrainBlending->TerrainShaderHacks();
 
 		TruePBR::GetSingleton()->SetShaderResouces();
 
 		auto skylighting = Skylighting::GetSingleton();
-		if (skylighting->loaded)
-			skylighting->SkylightingShaderHacks();
+//		if (skylighting->loaded)
+//			skylighting->SkylightingShaderHacks();
 
 		if (auto accumulator = RE::BSGraphics::BSShaderAccumulator::GetCurrentAccumulator()) {
 			// Set an unused bit to indicate if we are rendering an object in the main rendering pass
@@ -111,11 +111,11 @@ void State::Setup()
 {
 	TruePBR::GetSingleton()->SetupResources();
 	SetupResources();
-	for (auto* feature : Feature::GetFeatureList())
-		if (feature->loaded)
-			feature->SetupResources();
+//	for (auto* feature : Feature::GetFeatureList())
+//		if (feature->loaded)
+//			feature->SetupResources();
 	Deferred::GetSingleton()->SetupResources();
-	Streamline::GetSingleton()->SetupResources();
+//	Streamline::GetSingleton()->SetupResources();
 	if (initialized)
 		return;
 	initialized = true;
