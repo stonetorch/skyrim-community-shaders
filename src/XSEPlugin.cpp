@@ -1,5 +1,4 @@
 #include "Hooks.h"
-#include <OIT/Hooks.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
@@ -13,6 +12,7 @@
 #include "Upscaling.h"
 
 #include "ENB/ENBSeriesAPI.h"
+#include "OIT/OITProcess.h"
 
 #define DLLEXPORT __declspec(dllexport)
 
@@ -92,6 +92,7 @@ void MessageHandler(SKSE::MessagingInterface::Message* message)
 		{
 			if (errors.empty()) {
 				OIT::Hooks::Install();
+				Hooks::MyInstall();
 				return ;
 				auto state = State::GetSingleton();
 				state->PostPostLoad();  // state should load first so basic information is populated
