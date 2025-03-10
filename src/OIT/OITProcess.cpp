@@ -1,5 +1,6 @@
 #include "OITProcess.h"
 
+#include "OITState.h"
 #include "ShaderCache.h"
 #include "ShaderTools/BSShaderHooks.h"
 #include "State.h"
@@ -59,6 +60,16 @@ namespace OIT {
             static inline REL::Relocation<decltype(thunk)> func;
         };
 
+        struct IDXGISwapChain_Present {
+            static HRESULT WINAPI thunk(IDXGISwapChain *This, UINT SyncInterval, UINT Flags) {
+                OITState::GetSingleton()->RenderMenu();
+                auto retval = func(This, SyncInterval, Flags);
+                return retval;
+            }
+
+            static inline REL::Relocation<decltype(thunk)> func;
+        };
+
         struct BSGraphics_Renderer_Init_InitD3D {
             static void thunk() {
                 logger::info("Calling original Init3D");
@@ -81,6 +92,8 @@ namespace OIT {
                 }
 
                 InstallD3DHooks();
+
+                OITState::GetSingleton()->GetOITDebugger()->InitImGuiContext(swapchain, device, context);
             }
 
             static inline REL::Relocation<decltype(thunk)> func;
@@ -217,6 +230,10 @@ namespace OIT {
             } else {
                 logger::error("Cannot get ID3D11DeviceContext when hooking");
             }
+
+            logger::info("Hooking IDXGISwapChain::Present");
+            auto swapchain = RE::BSGraphics::Renderer::GetSingleton()->GetRuntimeData().renderWindows->swapChain;
+            stl::detour_vfunc<8, IDXGISwapChain_Present>(swapchain);
         }
     } // namespace Hooks
 } // namespace OIT

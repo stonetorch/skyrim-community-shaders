@@ -13,6 +13,7 @@
 
 #include "ENB/ENBSeriesAPI.h"
 #include "OIT/OITProcess.h"
+#include "OIT/OITState.h"
 
 #define DLLEXPORT __declspec(dllexport)
 
@@ -20,186 +21,182 @@ std::list<std::string> errors;
 
 bool Load();
 
-void InitializeLog([[maybe_unused]] spdlog::level::level_enum a_level = spdlog::level::info)
-{
-	// 创建一个控制台输出的 sink
-	//	auto consoleSink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
-	//	consoleSink->set_level(spdlog::level::debug);
-	//
-	//	// 创建 logger 并设置级别
-	//	auto log = std::make_shared<spdlog::logger>("global log", consoleSink);
-	//	log->set_level(a_level);
-	//	log->flush_on(spdlog::level::info);
-	//
-	//	// 设置默认 logger
-	//	spdlog::set_default_logger(log);
-	//	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] [%s:%#] %v");
-	//
-	auto path = logger::log_directory();
-	if (!path) {
-		util::report_and_fail("Failed to find standard logging directory"sv);
-	}
+void InitializeLog([[maybe_unused]] spdlog::level::level_enum a_level = spdlog::level::info) {
+    // 创建一个控制台输出的 sink
+    //	auto consoleSink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
+    //	consoleSink->set_level(spdlog::level::debug);
+    //
+    //	// 创建 logger 并设置级别
+    //	auto log = std::make_shared<spdlog::logger>("global log", consoleSink);
+    //	log->set_level(a_level);
+    //	log->flush_on(spdlog::level::info);
+    //
+    //	// 设置默认 logger
+    //	spdlog::set_default_logger(log);
+    //	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] [%s:%#] %v");
+    //
+    auto path = logger::log_directory();
+    if (!path) {
+        util::report_and_fail("Failed to find standard logging directory"sv);
+    }
 
-	*path /= std::format("{}.log"sv, Plugin::NAME);
-	auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
+    *path /= std::format("{}.log"sv, Plugin::NAME);
+    auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
 
 #ifndef NDEBUG
-	const auto level = spdlog::level::trace;
+    const auto level = spdlog::level::trace;
 #else
 	const auto level = a_level;
 #endif
 
-	auto log = std::make_shared<spdlog::logger>("global log"s, std::move(sink));
-	log->set_level(level);
-	log->flush_on(spdlog::level::info);
+    auto log = std::make_shared<spdlog::logger>("global log"s, std::move(sink));
+    log->set_level(level);
+    log->flush_on(spdlog::level::info);
 
-	spdlog::set_default_logger(std::move(log));
-	spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] [%s:%#] %v");
+    spdlog::set_default_logger(std::move(log));
+    spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] [%s:%#] %v");
 }
 
-extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* a_skse)
-{
+extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface *a_skse) {
 #ifndef NDEBUG
-	while (!REX::W32::IsDebuggerPresent()) {};
+    while (!REX::W32::IsDebuggerPresent()) {
+    };
 #endif
-	InitializeLog();
-	logger::info("Loaded {} {}", Plugin::NAME, Plugin::VERSION.string());
-	SKSE::Init(a_skse);
-	return Load();
+    InitializeLog();
+    logger::info("Loaded {} {}", Plugin::NAME, Plugin::VERSION.string());
+    SKSE::Init(a_skse);
+    return Load();
 }
 
 extern "C" DLLEXPORT constinit auto SKSEPlugin_Version = []() noexcept {
-	SKSE::PluginVersionData v;
-	v.PluginName(Plugin::NAME.data());
-	v.PluginVersion(Plugin::VERSION);
-	v.UsesAddressLibrary();
-	v.UsesNoStructs();
-	return v;
+    SKSE::PluginVersionData v;
+    v.PluginName(Plugin::NAME.data());
+    v.PluginVersion(Plugin::VERSION);
+    v.UsesAddressLibrary();
+    v.UsesNoStructs();
+    return v;
 }();
 
-extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface*, SKSE::PluginInfo* pluginInfo)
-{
-	pluginInfo->name = SKSEPlugin_Version.pluginName;
-	pluginInfo->infoVersion = SKSE::PluginInfo::kVersion;
-	pluginInfo->version = SKSEPlugin_Version.pluginVersion;
-	return true;
+extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface *, SKSE::PluginInfo *pluginInfo) {
+    pluginInfo->name = SKSEPlugin_Version.pluginName;
+    pluginInfo->infoVersion = SKSE::PluginInfo::kVersion;
+    pluginInfo->version = SKSEPlugin_Version.pluginVersion;
+    return true;
 }
 
-void MessageHandler(SKSE::MessagingInterface::Message* message)
-{
-	switch (message->type) {
-	case SKSE::MessagingInterface::kPostPostLoad:
-		{
-			if (errors.empty()) {
-				OIT::Hooks::Install();
-				Hooks::MyInstall();
-				return ;
-				auto state = State::GetSingleton();
-				state->PostPostLoad();  // state should load first so basic information is populated
-				Deferred::Hooks::Install();
-				TruePBR::GetSingleton()->PostPostLoad();
-				//				if (!state->IsFeatureDisabled("Upscaling")) {
-				//					Upscaling::InstallHooks();
-				//				}
-				Hooks::Install();
-				FrameAnnotations::OnPostPostLoad();
+void MessageHandler(SKSE::MessagingInterface::Message *message) {
+    switch (message->type) {
+        case SKSE::MessagingInterface::kPostPostLoad: {
+            if (errors.empty()) {
+                OIT::Hooks::Install();
+                OITState::GetSingleton()->Setup();
+                Hooks::MyInstall();
+                return;
+                auto state = State::GetSingleton();
+                state->PostPostLoad(); // state should load first so basic information is populated
+                Deferred::Hooks::Install();
+                TruePBR::GetSingleton()->PostPostLoad();
+                //				if (!state->IsFeatureDisabled("Upscaling")) {
+                //					Upscaling::InstallHooks();
+                //				}
+                Hooks::Install();
+                FrameAnnotations::OnPostPostLoad();
 
-				auto& shaderCache = SIE::ShaderCache::Instance();
+                auto &shaderCache = SIE::ShaderCache::Instance();
 
-				shaderCache.ValidateDiskCache();
+                shaderCache.ValidateDiskCache();
 
-				if (shaderCache.UseFileWatcher())
-					shaderCache.StartFileWatcher();
+                if (shaderCache.UseFileWatcher())
+                    shaderCache.StartFileWatcher();
 
-				//				for (auto* feature : Feature::GetFeatureList()) {
-				//					if (feature->loaded) {
-				//						feature->PostPostLoad();
-				//					}
-				//				}
-			}
+                //				for (auto* feature : Feature::GetFeatureList()) {
+                //					if (feature->loaded) {
+                //						feature->PostPostLoad();
+                //					}
+                //				}
+            }
 
-			break;
-		}
-	case SKSE::MessagingInterface::kDataLoaded:
-		{
-			for (auto it = errors.begin(); it != errors.end(); ++it) {
-				auto& errorMessage = *it;
-				RE::DebugMessageBox(std::format("Community Shaders\n{}, will disable all hooks and features", errorMessage).c_str());
-			}
+            break;
+        }
+        case SKSE::MessagingInterface::kDataLoaded: {
+            for (auto it = errors.begin(); it != errors.end(); ++it) {
+                auto &errorMessage = *it;
+                RE::DebugMessageBox(std::format("Community Shaders\n{}, will disable all hooks and features",
+                                                errorMessage).c_str());
+            }
 
-			if (errors.empty()) {
-				FrameAnnotations::OnDataLoaded();
+            if (errors.empty()) {
+                FrameAnnotations::OnDataLoaded();
 
-				auto& shaderCache = SIE::ShaderCache::Instance();
-				shaderCache.menuLoaded = true;
-				while (shaderCache.IsCompiling() && !shaderCache.backgroundCompilation) {
-					std::this_thread::sleep_for(100ms);
-				}
+                auto &shaderCache = SIE::ShaderCache::Instance();
+                shaderCache.menuLoaded = true;
+                while (shaderCache.IsCompiling() && !shaderCache.backgroundCompilation) {
+                    std::this_thread::sleep_for(100ms);
+                }
 
-				if (shaderCache.IsDiskCache()) {
-					shaderCache.WriteDiskCacheInfo();
-				}
+                if (shaderCache.IsDiskCache()) {
+                    shaderCache.WriteDiskCacheInfo();
+                }
 
-				if (!REL::Module::IsVR()) {
-					RE::GetINISetting("bEnableImprovedSnow:Display")->data.b = false;
-					RE::GetINISetting("bIBLFEnable:Display")->data.b = false;
-				}
+                if (!REL::Module::IsVR()) {
+                    RE::GetINISetting("bEnableImprovedSnow:Display")->data.b = false;
+                    RE::GetINISetting("bIBLFEnable:Display")->data.b = false;
+                }
 
-				TruePBR::GetSingleton()->DataLoaded();
-				for (auto* feature : Feature::GetFeatureList()) {
-					if (feature->loaded) {
-						feature->DataLoaded();
-					}
-				}
-			}
+                TruePBR::GetSingleton()->DataLoaded();
+                for (auto *feature: Feature::GetFeatureList()) {
+                    if (feature->loaded) {
+                        feature->DataLoaded();
+                    }
+                }
+            }
 
-			break;
-		}
-	}
+            break;
+        }
+    }
 }
 
-bool Load()
-{
-	//	if (ENB_API::RequestENBAPI()) {
-	//		logger::info("ENB detected, disabling all hooks and features");
-	//		return true;
-	//	}
+bool Load() {
+    //	if (ENB_API::RequestENBAPI()) {
+    //		logger::info("ENB detected, disabling all hooks and features");
+    //		return true;
+    //	}
 
-	if (REL::Module::IsVR()) {
-		//		REL::IDDatabase::get().IsVRAddressLibraryAtLeastVersion("0.158.0", true);
-	}
+    if (REL::Module::IsVR()) {
+        //		REL::IDDatabase::get().IsVRAddressLibraryAtLeastVersion("0.158.0", true);
+    }
 
-	auto privateProfileRedirectorVersion = Util::GetDllVersion(L"Data/SKSE/Plugins/PrivateProfileRedirector.dll");
-	//	if (privateProfileRedirectorVersion.has_value() && privateProfileRedirectorVersion.value().compare(REL::Version(0, 6, 2)) == std::strong_ordering::less) {
-	//		stl::report_and_fail("Old version of PrivateProfileRedirector detected, 0.6.2+ required if using it."sv);
-	//	}
+    auto privateProfileRedirectorVersion = Util::GetDllVersion(L"Data/SKSE/Plugins/PrivateProfileRedirector.dll");
+    //	if (privateProfileRedirectorVersion.has_value() && privateProfileRedirectorVersion.value().compare(REL::Version(0, 6, 2)) == std::strong_ordering::less) {
+    //		stl::report_and_fail("Old version of PrivateProfileRedirector detected, 0.6.2+ required if using it."sv);
+    //	}
 
-	auto messaging = SKSE::GetMessagingInterface();
-	messaging->RegisterListener("SKSE", MessageHandler);
+    auto messaging = SKSE::GetMessagingInterface();
+    messaging->RegisterListener("SKSE", MessageHandler);
 
-	auto state = State::GetSingleton();
-	state->Load();
+    auto state = State::GetSingleton();
+    state->Load();
 
-	// Prepare logger
-	auto log = spdlog::default_logger();
+    // Prepare logger
+    auto log = spdlog::default_logger();
 #if DEBUG
-	log->set_level(spdlog::level::debug);
+    log->set_level(spdlog::level::debug);
 #endif
-	log->set_level(state->GetLogLevel());
-	//	const std::array dlls = {
-	//		L"Data/SKSE/Plugins/ShaderTools.dll",
-	//		L"Data/SKSE/Plugins/SSEShaderTools.dll"
-	//	};
-	//
-	//	for (const auto dll : dlls) {
-	//		if (LoadLibrary(dll)) {
-	//			auto errorMessage = std::format("Incompatible DLL {} detected", stl::utf16_to_utf8(dll).value_or("<unicode conversion error>"s));
-	//			logger::error("{}", errorMessage);
-	//			errors.push_back(errorMessage);
-	//		}
-	//	}
+    log->set_level(state->GetLogLevel());
+    //	const std::array dlls = {
+    //		L"Data/SKSE/Plugins/ShaderTools.dll",
+    //		L"Data/SKSE/Plugins/SSEShaderTools.dll"
+    //	};
+    //
+    //	for (const auto dll : dlls) {
+    //		if (LoadLibrary(dll)) {
+    //			auto errorMessage = std::format("Incompatible DLL {} detected", stl::utf16_to_utf8(dll).value_or("<unicode conversion error>"s));
+    //			logger::error("{}", errorMessage);
+    //			errors.push_back(errorMessage);
+    //		}
+    //	}
 
-	if (errors.empty())
-		Hooks::InstallD3DHooks();
-	return true;
+    if (errors.empty())
+        Hooks::InstallD3DHooks();
+    return true;
 }
