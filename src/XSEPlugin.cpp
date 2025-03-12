@@ -89,7 +89,6 @@ void MessageHandler(SKSE::MessagingInterface::Message *message) {
         case SKSE::MessagingInterface::kPostPostLoad: {
             if (errors.empty()) {
                 OIT::Hooks::Install();
-                OITState::GetSingleton()->Setup();
                 Hooks::MyInstall();
                 return;
                 auto state = State::GetSingleton();

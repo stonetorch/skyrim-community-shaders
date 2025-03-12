@@ -1,52 +1,49 @@
-//
-// Created by 14982 on 25-3-10.
-//
+#pragma once
 
-#ifndef OITSTATE_H
-#define OITSTATE_H
-
+#include <PCH.h>
 #include <d3d11.h>
-#include <spdlog/spdlog.h>
 
 #include "OITDebugger.h"
 
-class OITState {
+class OITState
+{
 public:
-    static OITState *GetSingleton() {
-        static OITState singleton;
-        return &singleton;
-    }
+	static OITState* GetSingleton()
+	{
+		static OITState singleton;
+		return &singleton;
+	}
 
-    void Setup();
+	void Setup();
 
-    void Reset();
+	void Reset();
 
-    void RenderMenu() const;
+	void RenderMenu() const;
 
-    OITDebugger *GetOITDebugger() const;
+	OITDebugger* GetOITDebugger() const;
 
-    ID3D11Device *GetDevice() const {
-        return device;
-    }
+	ID3D11Device* GetDevice() const
+	{
+		return device;
+	}
 
-    ID3D11DeviceContext *GetContext() const {
-        return context;
-    }
+	ID3D11DeviceContext* GetContext() const
+	{
+		return context;
+	}
 
 private:
-    OITState() = default;
+	OITState();
 
-    ~OITState();
+	~OITState();
 
-    OITState(const OITState &) = delete;
+	OITState(const OITState&) = delete;
 
-    OITState &operator=(const OITState &) = delete;
+	OITState& operator=(const OITState&) = delete;
 
-    bool initialized = false;
-    ID3D11Device *device = nullptr;
-    ID3D11DeviceContext *context = nullptr;
+	bool initialized = false;
+	ID3D11Device* device = nullptr;
+	ID3D11DeviceContext* context = nullptr;
 
-    OITDebugger *oitDebugger;
+	OITDebugger* oitDebugger;
 };
-
-#endif  //OITSTATE_H

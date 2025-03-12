@@ -53,9 +53,7 @@ namespace BSShaderHooks {
                         } else {
                             failedCount++;
                         }
-                    } else {
-                        logger::info("shader query not found, techniqueID {}", entry->m_TechniqueID);
-                    }
+                    } 
                 }
             }
         }

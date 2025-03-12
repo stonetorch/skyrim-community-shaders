@@ -6,6 +6,8 @@
 #include "State.h"
 #include "Utils/D3D.h"
 
+#define debugger OITState::GetSingleton()->GetOITDebugger()
+
 namespace OIT {
     namespace Hooks {
         std::unordered_map<void *, std::pair<std::unique_ptr<uint8_t[]>, size_t> > ShaderBytecodeMap;
@@ -91,8 +93,8 @@ namespace OIT {
                     stl::detour_vfunc<15, ID3D11Device_CreatePixelShader>(device);
                 }
 
+                OITState::GetSingleton()->Setup();
                 InstallD3DHooks();
-
                 OITState::GetSingleton()->GetOITDebugger()->InitImGuiContext(swapchain, device, context);
             }
 
@@ -100,15 +102,20 @@ namespace OIT {
         };
 
         // DrawCall钩子结构
+#define LOG_DRAWCALLS OITState::GetSingleton()->GetOITDebugger()->debugger0
+
         struct ID3D11DeviceContext_DrawIndexed {
             static void STDMETHODCALLTYPE thunk(ID3D11DeviceContext *This, UINT IndexCount, UINT StartIndexLocation,
                                                 INT BaseVertexLocation) {
                 // 钩子前处理
-                logger::debug(fmt::runtime("DrawIndexed: IndexCount={}, StartIndexLocation={}, BaseVertexLocation={}"),
-                              IndexCount, StartIndexLocation, BaseVertexLocation);
+                if (LOG_DRAWCALLS)
+                    logger::debug(
+                        fmt::runtime("DrawIndexed: IndexCount={}, StartIndexLocation={}, BaseVertexLocation={}"),
+                        IndexCount, StartIndexLocation, BaseVertexLocation);
 
                 // 调用原始函数
-                func(This, IndexCount, StartIndexLocation, BaseVertexLocation);
+                if (!debugger->debugger1)
+                    func(This, IndexCount, StartIndexLocation, BaseVertexLocation);
             }
 
             static inline REL::Relocation<decltype(thunk)> func;
@@ -117,11 +124,13 @@ namespace OIT {
         struct ID3D11DeviceContext_Draw {
             static void STDMETHODCALLTYPE thunk(ID3D11DeviceContext *This, UINT VertexCount, UINT StartVertexLocation) {
                 // 钩子前处理
-                logger::debug(fmt::runtime("Draw: VertexCount={}, StartVertexLocation={}"),
-                              VertexCount, StartVertexLocation);
+                if (LOG_DRAWCALLS)
+                    logger::debug(fmt::runtime("Draw: VertexCount={}, StartVertexLocation={}"),
+                                  VertexCount, StartVertexLocation);
 
                 // 调用原始函数
-                func(This, VertexCount, StartVertexLocation);
+                if (!debugger->debugger2)
+                    func(This, VertexCount, StartVertexLocation);
 
                 // 钩子后处理
             }
@@ -135,11 +144,12 @@ namespace OIT {
                                                 UINT StartIndexLocation, INT BaseVertexLocation,
                                                 UINT StartInstanceLocation) {
                 // 钩子前处理
-                logger::debug(
-                    fmt::runtime(
-                        "DrawIndexedInstanced: IndexCountPerInstance={}, InstanceCount={}, StartIndexLocation={}, BaseVertexLocation={}, StartInstanceLocation={}"),
-                    IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation,
-                    StartInstanceLocation);
+                if (LOG_DRAWCALLS)
+                    logger::debug(
+                        fmt::runtime(
+                            "DrawIndexedInstanced: IndexCountPerInstance={}, InstanceCount={}, StartIndexLocation={}, BaseVertexLocation={}, StartInstanceLocation={}"),
+                        IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation,
+                        StartInstanceLocation);
 
                 // 调用原始函数
                 return; //TODO
@@ -157,10 +167,11 @@ namespace OIT {
                                                 UINT InstanceCount,
                                                 UINT StartVertexLocation, UINT StartInstanceLocation) {
                 // 钩子前处理
-                logger::debug(
-                    fmt::runtime(
-                        "DrawInstanced: VertexCountPerInstance={}, InstanceCount={}, StartVertexLocation={}, StartInstanceLocation={}"),
-                    VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation);
+                if (LOG_DRAWCALLS)
+                    logger::debug(
+                        fmt::runtime(
+                            "DrawInstanced: VertexCountPerInstance={}, InstanceCount={}, StartVertexLocation={}, StartInstanceLocation={}"),
+                        VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation);
 
                 // 调用原始函数
                 return; //TODO
@@ -175,7 +186,8 @@ namespace OIT {
         struct ID3D11DeviceContext_DrawAuto {
             static void STDMETHODCALLTYPE thunk(ID3D11DeviceContext *This) {
                 // 钩子前处理
-                logger::debug(fmt::runtime("DrawAuto"));
+                if (LOG_DRAWCALLS)
+                    logger::debug(fmt::runtime("DrawAuto"));
 
                 // 调用原始函数
                 func(This);
@@ -190,9 +202,10 @@ namespace OIT {
             static HRESULT STDMETHODCALLTYPE thunk(ID3D11DeviceContext *This, UINT ThreadGroupCountX,
                                                    UINT ThreadGroupCountY, UINT ThreadGroupCountZ) {
                 // 钩子前处理
-                logger::debug(
-                    fmt::runtime("Dispatch: ThreadGroupCountX={}, ThreadGroupCountY={}, ThreadGroupCountZ={}"),
-                    ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ);
+                if (LOG_DRAWCALLS)
+                    logger::debug(
+                        fmt::runtime("Dispatch: ThreadGroupCountX={}, ThreadGroupCountY={}, ThreadGroupCountZ={}"),
+                        ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ);
 
                 // 调用原始函数
                 HRESULT hr = func(This, ThreadGroupCountX, ThreadGroupCountY, ThreadGroupCountZ);
@@ -204,7 +217,34 @@ namespace OIT {
             static inline REL::Relocation<decltype(thunk)> func;
         };
 
+        struct BSInputDeviceManager_PollInputDevices {
+            static void thunk(RE::BSTEventSource<RE::InputEvent *> *a_dispatcher, RE::InputEvent *const*a_events) {
+                bool allowBlockDevice = true;
+                auto menu = OITState::GetSingleton()->GetOITDebugger();
+
+                if (a_events) {
+                    menu->ProcessInputEvents(a_events);
+                }
+
+                if (allowBlockDevice && menu->ShouldSwallowInput()) {
+                    //the menu is open, eat all keypresses
+                    constexpr RE::InputEvent *const dummy[] = {nullptr};
+                    func(a_dispatcher, dummy);
+                    return;
+                }
+
+                func(a_dispatcher, a_events);
+            }
+
+            static inline REL::Relocation<decltype(thunk)> func;
+        };
+
         void Install() {
+            logger::info("Hooking BSInputDeviceManager::PollInputDevices");
+            stl::write_thunk_call<BSInputDeviceManager_PollInputDevices>(
+                REL::RelocationID(67315, 68617).address() + REL::Relocate(0x7B, 0x7B, 0x81));
+
+
             logger::info("Hooking BSShader::LoadShaders");
             stl::detour_thunk<BSShader_LoadShaders>(REL::RelocationID(101339, 108326));
 
