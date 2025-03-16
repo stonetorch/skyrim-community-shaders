@@ -13,7 +13,69 @@ struct SceneObject {
     SceneObject(ID3D11DeviceContext *context, ID3D11Device *device, UINT indexCount, UINT startIndexLocation,
                 INT baseVertexLocation);
     
-    SceneObject(SceneObject&& other) noexcept;
+    SceneObject(SceneObject&& other) noexcept
+        : IndexCount(other.IndexCount),
+          StartIndexLocation(other.StartIndexLocation),
+          BaseVertexLocation(other.BaseVertexLocation),
+          indexBuffer(other.indexBuffer),
+          numVertexBuffers(other.numVertexBuffers),
+          indexFormat(other.indexFormat),
+          vertexShader(other.vertexShader),
+          pixelShader(other.pixelShader),
+          inputLayout(other.inputLayout),
+          numConstantBuffers(other.numConstantBuffers),
+          numShaderResources(other.numShaderResources),
+          numSamplers(other.numSamplers),
+          topology(other.topology),
+          numViewports(other.numViewports),
+          depthStencilState(other.depthStencilState),
+          stencilRef(other.stencilRef),
+          rasterizerState(other.rasterizerState),
+          blendState(other.blendState),
+          sampleMask(other.sampleMask),
+          vertexBuffer(other.vertexBuffer) {
+        
+        // 复制数组成员
+        for (UINT i = 0; i < D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT; ++i) {
+            vertexBuffers[i] = other.vertexBuffers[i];
+            strides[i] = other.strides[i];
+            offsets[i] = other.offsets[i];
+            other.vertexBuffers[i] = nullptr;
+        }
+        
+        for (UINT i = 0; i < D3D11_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT; ++i) {
+            constantBuffers[i] = other.constantBuffers[i];
+            other.constantBuffers[i] = nullptr;
+        }
+        
+        for (UINT i = 0; i < D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT; ++i) {
+            shaderResources[i] = other.shaderResources[i];
+            other.shaderResources[i] = nullptr;
+        }
+        
+        for (UINT i = 0; i < D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT; ++i) {
+            samplers[i] = other.samplers[i];
+            other.samplers[i] = nullptr;
+        }
+        
+        for (UINT i = 0; i < D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE; ++i) {
+            viewports[i] = other.viewports[i];
+        }
+        
+        for (UINT i = 0; i < 4; ++i) {
+            blendFactor[i] = other.blendFactor[i];
+        }
+        
+        // 将源对象的指针置空，避免双重释放
+        other.indexBuffer = nullptr;
+        other.vertexShader = nullptr;
+        other.pixelShader = nullptr;
+        other.inputLayout = nullptr;
+        other.depthStencilState = nullptr;
+        other.rasterizerState = nullptr;
+        other.blendState = nullptr;
+        other.vertexBuffer = nullptr;
+    }
 
     ~SceneObject() = default;
 

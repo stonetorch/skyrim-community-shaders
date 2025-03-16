@@ -135,7 +135,6 @@ SceneObject::SceneObject(ID3D11DeviceContext *context, ID3D11Device *device, UIN
                 stagingBuffer->Release();
             }
         }
-        // vertexBuffers[0]->Release(); // TODO 猜的，这个时候不应该release
         vertexBuffer = vertexBuffers[0]; // 将指针赋值给成员变量
     }
 
