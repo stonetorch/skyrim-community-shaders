@@ -21,6 +21,7 @@ void OITState::Setup()
 	}
 
 	this->oitDebugger = new OITDebugger();
+	this->sceneManager = new SceneManager();
 	// 获取D3D11设备和上下文
 	auto renderer = RE::BSGraphics::Renderer::GetSingleton();
 	device = reinterpret_cast<ID3D11Device*>(renderer->GetRuntimeData().forwarder);

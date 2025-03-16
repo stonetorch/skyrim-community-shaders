@@ -1,6 +1,7 @@
 #include "OITProcess.h"
 
 #include "OITState.h"
+#include "SceneManager.h"
 #include "ShaderCache.h"
 #include "ShaderTools/BSShaderHooks.h"
 #include "State.h"
@@ -11,6 +12,7 @@
 namespace OIT {
     namespace Hooks {
         std::unordered_map<void *, std::pair<std::unique_ptr<uint8_t[]>, size_t> > ShaderBytecodeMap;
+        bool isCapturing = false;
 
         void RegisterShaderBytecode(void *Shader, const void *Bytecode, size_t BytecodeLength) {
             auto codeCopy = std::make_unique<uint8_t[]>(BytecodeLength);
@@ -23,6 +25,30 @@ namespace OIT {
         const std::pair<std::unique_ptr<uint8_t[]>, size_t> &GetShaderBytecode(void *Shader) {
             logger::debug(fmt::runtime("Loading shader at index {:x}"), (std::uintptr_t) Shader);
             return ShaderBytecodeMap.at(Shader);
+        }
+
+        // 开始捕获DrawCall
+        void StartCapturing() {
+            isCapturing = true;
+            logger::info("开始捕获DrawIndexed调用");
+        }
+
+        // 停止捕获DrawCall
+        void StopCapturing() {
+            isCapturing = false;
+            logger::info("停止捕获DrawIndexed调用");
+        }
+
+        // 捕获DrawIndexed调用信息
+        void CaptureDrawIndexedCall(ID3D11DeviceContext *context, ID3D11Device *device, UINT IndexCount,
+                                    UINT StartIndexLocation, INT BaseVertexLocation) {
+            if (!OIT::Hooks::isCapturing)
+                return;
+
+            logger::debug("捕获DrawIndexed调用: IndexCount={}, StartIndexLocation={}, BaseVertexLocation={}",
+                          IndexCount, StartIndexLocation, BaseVertexLocation);
+            OITState::GetSingleton()->GetSceneManager()->AddSceneObject(context, device, IndexCount, StartIndexLocation,
+                                                                        BaseVertexLocation);
         }
 
         struct ID3D11Device_CreateVertexShader {
@@ -113,6 +139,20 @@ namespace OIT {
                         fmt::runtime("DrawIndexed: IndexCount={}, StartIndexLocation={}, BaseVertexLocation={}"),
                         IndexCount, StartIndexLocation, BaseVertexLocation);
 
+                // 捕获DrawIndexed调用信息
+                if (isCapturing) {
+                    ID3D11Device *pDevice;
+                    This->GetDevice(&pDevice);
+                    CaptureDrawIndexedCall(This, pDevice, IndexCount, StartIndexLocation, BaseVertexLocation);
+                }
+
+                auto context = OITState::GetSingleton()->GetContext();
+
+                ID3D11DepthStencilState *stencilState;
+                UINT stencilRef = 0;
+                context->OMGetDepthStencilState(&stencilState, &stencilRef);
+                D3D11_DEPTH_STENCIL_DESC desc;
+                stencilState->GetDesc(&desc);
                 // 调用原始函数
                 if (!debugger->debugger1)
                     func(This, IndexCount, StartIndexLocation, BaseVertexLocation);
@@ -244,7 +284,6 @@ namespace OIT {
             stl::write_thunk_call<BSInputDeviceManager_PollInputDevices>(
                 REL::RelocationID(67315, 68617).address() + REL::Relocate(0x7B, 0x7B, 0x81));
 
-
             logger::info("Hooking BSShader::LoadShaders");
             stl::detour_thunk<BSShader_LoadShaders>(REL::RelocationID(101339, 108326));
 
@@ -317,4 +356,12 @@ void OITProcess::OnPrepass() {
     };
     context->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
     context->Dispatch(8, 1, 1);
+}
+
+// 实现OnDraw函数，用于重现DrawIndexed调用
+void OITProcess::OnDraw() {
+    auto context = OITState::GetSingleton()->GetContext();
+    auto device = OITState::GetSingleton()->GetDevice();
+
+    OITState::GetSingleton()->GetSceneManager()->OnDraw(context, device);
 }
