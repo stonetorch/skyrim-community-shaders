@@ -1,5 +1,9 @@
 #include "OITProcess.h"
 
+#include <d3dcompiler.h>
+// 引入调用栈捕获工具
+#include "Utils/CallstackCapture.h"
+
 #include "OITState.h"
 #include "SceneManager.h"
 #include "ShaderCache.h"
@@ -13,6 +17,8 @@ namespace OIT {
     namespace Hooks {
         std::unordered_map<void *, std::pair<std::unique_ptr<uint8_t[]>, size_t> > ShaderBytecodeMap;
         bool isCapturing = false;
+        // 定义DrawCall调用地址数据结构
+        Utils::CallstackCapture::CallSitesMap drawCallSites;
 
         void RegisterShaderBytecode(void *Shader, const void *Bytecode, size_t BytecodeLength) {
             auto codeCopy = std::make_unique<uint8_t[]>(BytecodeLength);
@@ -90,6 +96,28 @@ namespace OIT {
 
         struct IDXGISwapChain_Present {
             static HRESULT WINAPI thunk(IDXGISwapChain *This, UINT SyncInterval, UINT Flags) {
+                //TODO 可能需要使用Skyrim的按键池
+
+                // 检查是否按下了指定快捷键
+                static bool f11KeyWasDown = false;
+                bool f11KeyIsDown = (GetAsyncKeyState(VK_F11) & 0x8000) != 0;
+
+                if (f11KeyIsDown && !f11KeyWasDown) {
+                    // 导出并分析DrawCall调用地址数据
+                    Utils::CallstackCapture::DumpCallSites(drawCallSites, "DrawCallAddresses.log");
+                    Utils::CallstackCapture::AnalyzeCallSites(drawCallSites, "DrawCallAnalysis.log");
+                }
+                f11KeyWasDown = f11KeyIsDown;
+
+                // 添加清除数据的快捷键 (F12)
+                static bool f12KeyWasDown = false;
+                bool f12KeyIsDown = (GetAsyncKeyState(VK_F12) & 0x8000) != 0;
+
+                if (f12KeyIsDown && !f12KeyWasDown) {
+                    Utils::CallstackCapture::ClearCallSites(drawCallSites);
+                }
+                f12KeyWasDown = f12KeyIsDown;
+
                 OITState::GetSingleton()->RenderMenu();
                 auto retval = func(This, SyncInterval, Flags);
                 return retval;
@@ -133,6 +161,10 @@ namespace OIT {
         struct ID3D11DeviceContext_DrawIndexed {
             static void STDMETHODCALLTYPE thunk(ID3D11DeviceContext *This, UINT IndexCount, UINT StartIndexLocation,
                                                 INT BaseVertexLocation) {
+                // 捕获调用地址
+                uintptr_t returnAddr = reinterpret_cast<uintptr_t>(_ReturnAddress());
+                Utils::CallstackCapture::RecordCallSite(drawCallSites, returnAddr, "DrawIndexed");
+
                 // 钩子前处理
                 if (LOG_DRAWCALLS)
                     logger::debug(
@@ -163,6 +195,10 @@ namespace OIT {
 
         struct ID3D11DeviceContext_Draw {
             static void STDMETHODCALLTYPE thunk(ID3D11DeviceContext *This, UINT VertexCount, UINT StartVertexLocation) {
+                // 捕获调用地址
+                uintptr_t returnAddr = reinterpret_cast<uintptr_t>(_ReturnAddress());
+                Utils::CallstackCapture::RecordCallSite(drawCallSites, returnAddr, "Draw");
+
                 // 钩子前处理
                 if (LOG_DRAWCALLS)
                     logger::debug(fmt::runtime("Draw: VertexCount={}, StartVertexLocation={}"),
@@ -183,6 +219,10 @@ namespace OIT {
                                                 UINT InstanceCount,
                                                 UINT StartIndexLocation, INT BaseVertexLocation,
                                                 UINT StartInstanceLocation) {
+                // 捕获调用地址
+                uintptr_t returnAddr = reinterpret_cast<uintptr_t>(_ReturnAddress());
+                Utils::CallstackCapture::RecordCallSite(drawCallSites, returnAddr, "DrawIndexedInstanced");
+
                 // 钩子前处理
                 if (LOG_DRAWCALLS)
                     logger::debug(
@@ -192,9 +232,8 @@ namespace OIT {
                         StartInstanceLocation);
 
                 // 调用原始函数
-                return; //TODO
                 func(This, IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation,
-                     StartInstanceLocation); //TODO 检查这里的签名
+                     StartInstanceLocation);
 
                 // 钩子后处理
             }
@@ -206,6 +245,10 @@ namespace OIT {
             static void STDMETHODCALLTYPE thunk(ID3D11DeviceContext *This, UINT VertexCountPerInstance,
                                                 UINT InstanceCount,
                                                 UINT StartVertexLocation, UINT StartInstanceLocation) {
+                // 捕获调用地址
+                uintptr_t returnAddr = reinterpret_cast<uintptr_t>(_ReturnAddress());
+                Utils::CallstackCapture::RecordCallSite(drawCallSites, returnAddr, "DrawInstanced");
+
                 // 钩子前处理
                 if (LOG_DRAWCALLS)
                     logger::debug(
@@ -214,7 +257,6 @@ namespace OIT {
                         VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation);
 
                 // 调用原始函数
-                return; //TODO
                 func(This, VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation);
 
                 // 钩子后处理
@@ -225,6 +267,10 @@ namespace OIT {
 
         struct ID3D11DeviceContext_DrawAuto {
             static void STDMETHODCALLTYPE thunk(ID3D11DeviceContext *This) {
+                // 捕获调用地址
+                uintptr_t returnAddr = reinterpret_cast<uintptr_t>(_ReturnAddress());
+                Utils::CallstackCapture::RecordCallSite(drawCallSites, returnAddr, "DrawAuto");
+
                 // 钩子前处理
                 if (LOG_DRAWCALLS)
                     logger::debug(fmt::runtime("DrawAuto"));
@@ -241,6 +287,10 @@ namespace OIT {
         struct ID3D11DeviceContext_Dispatch {
             static HRESULT STDMETHODCALLTYPE thunk(ID3D11DeviceContext *This, UINT ThreadGroupCountX,
                                                    UINT ThreadGroupCountY, UINT ThreadGroupCountZ) {
+                // 捕获调用地址
+                uintptr_t returnAddr = reinterpret_cast<uintptr_t>(_ReturnAddress());
+                Utils::CallstackCapture::RecordCallSite(drawCallSites, returnAddr, "Dispatch");
+
                 // 钩子前处理
                 if (LOG_DRAWCALLS)
                     logger::debug(
